@@ -8,7 +8,7 @@ It runs in **Outlook on the web** and **New Outlook for Windows**.
 | --- | --- |
 | **Install guide** | https://defoxxanalytics.github.io/email-style/install.html |
 | **Live add-in** | https://defoxxanalytics.github.io/email-style/ (published from `site/` by GitHub Actions) |
-| **Current version** | engine `launchevent.js?v=34`, manifest `1.0.0.0`, add-in Id `965d12db-94ce-4f1a-a25b-069ec2fa6665` |
+| **Current version** | engine `launchevent.js?v=35`, manifest `1.0.0.0`, add-in Id `965d12db-94ce-4f1a-a25b-069ec2fa6665` |
 | **Tests** | `npm test`: 281 checks plus older suites and a re-send stability check |
 
 > **Every push to `main` goes live.** GitHub Actions runs the tests and the manifest check, then publishes `site/` to GitHub Pages. Outlook loads the add-in from there, so a change reaches every user's Send button about 10 minutes later.
