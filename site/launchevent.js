@@ -20,13 +20,24 @@ var FEATURE_DEFAULTS = {
   attachmentCheck: true,
 };
 var OWN_MARKUP = /\bvstx-/;
-var ASSET_BASE = "https://defoxxanalytics.github.io/vstx-email-style/assets/";
-var LOGO_URL = ASSET_BASE + "vstx-logo-v2.png";
-var LOGO_WIDTH = 42;
-var LOGO_HEIGHT = 54;
-var HEXAGONS_URL = ASSET_BASE + "vstx-hexagons.png";
-var HEXAGONS_WIDTH = 52;
-var HEXAGONS_HEIGHT = 49;
+var ASSET_BASE = "https://defoxxanalytics.github.io/email-style/assets/";
+// The signature panel carries the sender's company: its logo on the left, its motif on the right.
+// Everything else (colours, band, lists, tables) is shared by both companies.
+var SIGNATURE_BRANDS = {
+  defoxx: {
+    name: "D.E. Foxx & Associates",
+    logo: { url: ASSET_BASE + "defoxx-logo.png", width: 70, height: 54 },
+    motif: { url: ASSET_BASE + "defoxx-x.png", width: 49, height: 49 },
+  },
+  versatex: {
+    name: "Versatex",
+    logo: { url: ASSET_BASE + "vstx-logo-v2.png", width: 42, height: 54 },
+    motif: { url: ASSET_BASE + "vstx-hexagons.png", width: 52, height: 49 },
+  },
+};
+// Senders at these domains get that company's panel; everyone else gets the parent company's.
+var BRAND_BY_DOMAIN = { "versatexmsp.com": "versatex" };
+var DEFAULT_BRAND = "defoxx";
 var FONT_STACK = "Roboto,Arial,sans-serif";
 var INK = "#231f20";
 var GREY = "#58595b";
@@ -1063,9 +1074,13 @@ function brandBarHtml() {
   );
 }
 
+function userProfile() {
+  return (typeof Office !== "undefined" && Office.context && Office.context.mailbox && Office.context.mailbox.userProfile) || null;
+}
+
 // The directory lists people as "Last, First"; a signature reads "First Last".
 function profileName() {
-  var profile = typeof Office !== "undefined" && Office.context && Office.context.mailbox && Office.context.mailbox.userProfile;
+  var profile = userProfile();
   if (!profile) return "";
   var display = (profile.displayName || "").trim();
   var lastFirst = /^([^,]+),\s*(.+)$/.exec(display);
@@ -1073,9 +1088,19 @@ function profileName() {
   return display || (profile.emailAddress || "").split("@")[0];
 }
 
-// Until someone saves their own details, the signature carries just their name from Outlook.
+function isBrand(key) {
+  return typeof key === "string" && Object.prototype.hasOwnProperty.call(SIGNATURE_BRANDS, key);
+}
+
+function brandForAddress(address) {
+  var domain = String(address || "").split("@").pop().trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(BRAND_BY_DOMAIN, domain) ? BRAND_BY_DOMAIN[domain] : DEFAULT_BRAND;
+}
+
+// Until someone saves their own details, the signature carries their name from Outlook and their company from their address.
 function signatureDefaults() {
-  return { name: profileName(), title: "", phone: "" };
+  var profile = userProfile();
+  return { name: profileName(), title: "", phone: "", brand: brandForAddress(profile && profile.emailAddress) };
 }
 
 function isSignatureSetUp() {
@@ -1088,7 +1113,7 @@ function signatureDetails() {
   var pick = function (key) {
     return typeof saved[key] === "string" ? saved[key].trim() : defaults[key];
   };
-  return { name: pick("name") || defaults.name, title: pick("title"), phone: pick("phone") };
+  return { name: pick("name") || defaults.name, title: pick("title"), phone: pick("phone"), brand: isBrand(saved.brand) ? saved.brand : defaults.brand };
 }
 
 function signatureLines(details) {
@@ -1104,23 +1129,26 @@ function signatureLines(details) {
 function signatureHtml(details) {
   var text = "font-family:" + FONT_STACK + ";";
   details = details || signatureDetails();
+  var brand = SIGNATURE_BRANDS[isBrand(details.brand) ? details.brand : signatureDefaults().brand];
+  var logo = brand.logo;
+  var motif = brand.motif;
   var panel = ' bgcolor="' + PANEL + '"';
   var panelCss = "background:" + PANEL + ";";
   return (
     '<table id="' + VSTX_SIGNATURE_ID + '" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse">' +
     "<tr>" + ruleCell(24, "", ' colspan="3"') + "</tr>" +
     "<tr>" +
-    '<td width="' + LOGO_WIDTH + '"' + panel + ' style="' + panelCss + "border-radius:" + RADIUS + " 0 0 " + RADIUS + ";width:" + LOGO_WIDTH + 'px;padding:12px 14px 12px 16px;vertical-align:middle">' +
-    '<img src="' + LOGO_URL + '" width="' + LOGO_WIDTH + '" height="' + LOGO_HEIGHT + '" alt="Versatex"' +
-    ' style="display:block;width:' + LOGO_WIDTH + "px;height:" + LOGO_HEIGHT + "px;border:0;outline:none;" +
+    '<td width="' + logo.width + '"' + panel + ' style="' + panelCss + "border-radius:" + RADIUS + " 0 0 " + RADIUS + ";width:" + logo.width + 'px;padding:12px 14px 12px 16px;vertical-align:middle">' +
+    '<img src="' + logo.url + '" width="' + logo.width + '" height="' + logo.height + '" alt="' + escapeHtml(brand.name) + '"' +
+    ' style="display:block;width:' + logo.width + "px;height:" + logo.height + "px;border:0;outline:none;" +
     text + "font-size:12px;font-weight:700;color:" + INK + '">' +
     "</td>" +
     "<td" + panel + ' style="' + panelCss + "vertical-align:middle;padding:10px 16px 10px 14px;border-left:3px solid " + YELLOW + '">' +
     signatureLines(details) +
     "</td>" +
     '<td align="right"' + panel + ' style="' + panelCss + "border-radius:0 " + RADIUS + " " + RADIUS + ' 0;vertical-align:middle;padding:10px 16px 10px 10px">' +
-    '<img src="' + HEXAGONS_URL + '" width="' + HEXAGONS_WIDTH + '" height="' + HEXAGONS_HEIGHT + '" alt=""' +
-    ' style="display:block;width:' + HEXAGONS_WIDTH + "px;height:" + HEXAGONS_HEIGHT + 'px;border:0;outline:none;margin-left:auto">' +
+    '<img src="' + motif.url + '" width="' + motif.width + '" height="' + motif.height + '" alt=""' +
+    ' style="display:block;width:' + motif.width + "px;height:" + motif.height + 'px;border:0;outline:none;margin-left:auto">' +
     "</td>" +
     "</tr></table>"
   );
@@ -1323,7 +1351,7 @@ function onMessageSendHandler(event) {
       }
       event.completed({
         allowEvent: false,
-        errorMessage: "Versatex style applied. Check how the email looks, then select Send again.",
+        errorMessage: "Email style applied. Check how the email looks, then select Send again.",
       });
     })
     .catch(function (error) {
@@ -1333,7 +1361,7 @@ function onMessageSendHandler(event) {
       }
       event.completed({
         allowEvent: false,
-        errorMessage: "Couldn't apply the Versatex style to this email: " + describeError(error),
+        errorMessage: "Couldn't apply the email style to this email: " + describeError(error),
         sendModeOverride: Office.MailboxEnums.SendModeOverride.PromptUser,
       });
     });
@@ -1365,7 +1393,7 @@ function showSetupPrompt(item, commandId, done) {
     "vstx-setup",
     {
       type: Office.MailboxEnums.ItemNotificationMessageType.InsightMessage,
-      message: "Finish your Versatex signature: add your title and phone once, and every email carries it.",
+      message: "Finish your email signature: add your title and phone once, and every email carries it.",
       icon: "Icon.16x16",
       actions: [
         {
@@ -1396,10 +1424,10 @@ function notify(message) {
 }
 
 var PREVIEW_MESSAGES = {
-  styled: "Versatex style applied.",
-  refreshed: "Versatex style refreshed for your latest edits.",
-  unchanged: "This email already has the Versatex style.",
-  "plain-text": "This is a plain-text email, so the Versatex style isn't applied.",
+  styled: "Email style applied.",
+  refreshed: "Email style refreshed for your latest edits.",
+  unchanged: "This email already has the email style.",
+  "plain-text": "This is a plain-text email, so the email style isn't applied.",
 };
 
 function previewStyle(event) {

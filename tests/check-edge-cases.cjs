@@ -28,7 +28,7 @@ const cases = [
   ["Pasted Excel table", body(defaultDiv("Results:") + `<table><tr><td style="background:#C6EFCE;color:#006100;font-size:9pt;font-family:Calibri">+12%</td><td style="background:#FFC7CE;color:#9C0006;font-size:9pt">-8%</td></tr></table>`), (o) => `+12% colour ${effective(tagBefore(o, "+12%"), "color")}, size ${effective(tagBefore(o, "+12%"), "font-size")}, font ${effective(tagBefore(o, "+12%"), "font-family")}`],
   ["Quoted family entity", body(`<div style="font-family:&quot;Segoe UI&quot;,sans-serif;font-size:12pt;color:rgb(15,108,189)">Entity font</div>`), (o) => `font ${effective(tagBefore(o, "Entity font"), "font-family")}, colour ${effective(tagBefore(o, "Entity font"), "color")}`],
   ["Link in text", body(defaultDiv(`See <a href="https://example.com" style="color:#0f6cbd">the report</a>`)), (o) => `link colour ${effective(tagBefore(o, "the report"), "color")}`],
-  ["Logo image", body(defaultDiv("x")), (o) => `logo ${/vstx-logo-v2\.png/.test(o)}, hexagons ${/vstx-hexagons\.png/.test(o)}, alt styled ${/alt="Versatex"[^>]*font-weight:700/.test(o)}`],
+  ["Logo image", body(defaultDiv("x")), (o) => `logo ${/defoxx-logo\.png/.test(o)}, motif ${/defoxx-x\.png/.test(o)}, alt styled: ${/alt="D\.E\. Foxx &amp; Associates"[^>]*font-weight:700/.test(o)}`],
 ];
 
 for (const [name, html, check] of cases) console.log(name.padEnd(22), "|", check(context.applyVersatexStyle(html)));

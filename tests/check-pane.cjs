@@ -48,7 +48,7 @@ function open(stored, options = {}) {
       actions: { associate() { throw new Error("pane must not associate actions"); } },
       onReady(fn) { fn(); },
       context: {
-        mailbox: { userProfile: { displayName: "Reyes, Jordan", emailAddress: "jreyes@example.com" } },
+        mailbox: { userProfile: { displayName: "Reyes, Jordan", emailAddress: options.email || "jreyes@example.com" } },
         roamingSettings: {
           get: (key) => store[key],
           set: (key, value) => { store[key] = JSON.parse(JSON.stringify(value)); },
@@ -159,6 +159,22 @@ report("previews follow typing", /Head of Analytics/.test(p.elements["preview-sh
 
 p = open({ vstxSignature: { name: "J.Reyes", title: "Analytics", phone: "1" } });
 report("set up: welcome banner hidden", p.elements.welcome.hidden === true);
+
+// Company: picked from the address until the sender chooses, and saved with the signature
+const headerIs = (p, file) => p.elements["brand-logo"].src === "assets/" + file;
+p = open({});
+report("fresh install: company from the address (D.E. Foxx)", p.elements.brand.value === "defoxx" && headerIs(p, "defoxx-horizontal-reversed.png") && /defoxx-logo\.png/.test(p.elements.preview.innerHTML));
+p = open({}, { email: "jordan.reyes@versatexmsp.com" });
+report("fresh install at versatexmsp.com: Versatex company, header and preview", p.elements.brand.value === "versatex" && headerIs(p, "vstx-horizontal-light.png") && /vstx-logo-v2\.png/.test(p.elements.preview.innerHTML));
+p = open({});
+p.elements.brand.value = "versatex";
+p.elements.brand.fire("change");
+report("changing the company redraws the preview and the header", /vstx-logo-v2\.png/.test(p.elements.preview.innerHTML) && headerIs(p, "vstx-horizontal-light.png") && p.elements["brand-logo"].alt === "Versatex");
+report("changing the company alone doesn't save", p.saves() === 0);
+p.elements["signature-form"].fire("submit");
+report("Save stores the company with the signature", p.store.vstxSignature.brand === "versatex" && p.store.vstxSignature.name === "Jordan Reyes");
+p = open({ vstxSignature: { name: "Jordan Reyes", title: "", phone: "", brand: "versatex" } });
+report("a saved company wins over the address", p.elements.brand.value === "versatex" && headerIs(p, "vstx-horizontal-light.png"));
 
 // Signature preview drawn at phone width, scaled to the pane
 p = open({}, { paneWidth: 288 });

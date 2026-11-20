@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Versatex settings</title>
+  <title>Email style settings</title>
   <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script type="text/javascript">var VSTX_SETTINGS_PANE = true;</script>
   <script type="text/javascript" id="engine" src="launchevent.js?v=34"></script>
@@ -78,11 +78,12 @@
     h2::before { content: ""; display: block; width: 24px; height: 3px; margin-bottom: 8px; background: var(--yellow); }
 
     .field-label { display: block; margin: 16px 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-    input:not(.switch) {
+    input:not(.switch), select {
       width: 100%; height: 40px; padding: 0 12px; border: 1px solid var(--field-line); border-radius: var(--radius);
       font: inherit; color: var(--text); background: var(--field);
     }
-    input:not(.switch):focus-visible { outline: 2px solid var(--text); outline-offset: 0; border-color: var(--text); }
+    select { cursor: pointer; }
+    input:not(.switch):focus-visible, select:focus-visible { outline: 2px solid var(--text); outline-offset: 0; border-color: var(--text); }
 
     .paper { background: #ffffff; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
     /* Scaling leaves hairline seams between the signature's cells; the panel colour behind them hides those. */
@@ -155,7 +156,7 @@
 <body>
   <div class="top">
     <header class="band">
-      <img src="assets/vstx-horizontal-light.png" alt="Versatex" />
+      <img id="brand-logo" src="assets/defoxx-horizontal-reversed.png" alt="D.E. Foxx &amp; Associates" />
       <span class="active-pill" title="Styling runs on every email you send"><span class="marker" aria-hidden="true">&#11042;</span><span id="version">Active</span></span>
     </header>
     <nav class="tabs" role="tablist" aria-label="Settings">
@@ -168,14 +169,20 @@
   <main>
     <section role="tabpanel" id="panel-signature" aria-labelledby="tab-signature">
       <div class="welcome" id="welcome" hidden>
-        <strong>Welcome to Versatex Email Style.</strong>
-        Check your name, add your title and phone, then select Save. Every email you send after that carries your signature.
+        <strong>Welcome to D.E. Foxx Email Style.</strong>
+        Check your company and name, add your title and phone, then select Save. Every email you send after that carries your signature.
       </div>
 
       <h1>Your email signature</h1>
       <p class="lead">Added to every email and invite the add-in styles. Leave the title or phone empty to hide that line.</p>
 
       <form id="signature-form" novalidate>
+        <label class="field-label" for="brand">Company</label>
+        <select id="brand" name="brand">
+          <option value="defoxx">D.E. Foxx &amp; Associates</option>
+          <option value="versatex">Versatex</option>
+        </select>
+
         <label class="field-label" for="name">Name</label>
         <input id="name" name="name" maxlength="60" autocomplete="name" required />
 
@@ -350,7 +357,7 @@
 
     <section role="tabpanel" id="panel-help" aria-labelledby="tab-help" hidden>
       <h1>How it works</h1>
-      <p class="lead">Write as usual. When you select Send, the add-in restyles your part of the email in the Versatex look; earlier messages in a thread are left alone. Every word you wrote arrives: if styling would drop one, the email goes with basic styling instead.</p>
+      <p class="lead">Write as usual. When you select Send, the add-in restyles your part of the email in your company's look; earlier messages in a thread are left alone. Every word you wrote arrives: if styling would drop one, the email goes with basic styling instead.</p>
 
       <h2>Subject tags</h2>
       <ul class="tips">
@@ -360,13 +367,13 @@
 
       <h2>Tips</h2>
       <ul class="tips">
-        <li>Select <b>Apply Versatex style</b> in the message toolbar to style the draft now and check it before you send.</li>
+        <li>Select <b>Apply email style</b> in the message toolbar to style the draft now and check it before you send.</li>
         <li>Your own colours, sizes and code keep their look; only Outlook's default text is restyled.</li>
         <li>Pasting from Word, Teams or a document is fine: lists keep their shape.</li>
         <li>Emails written in the Outlook phone app go out unstyled; they look fine when read on a phone.</li>
       </ul>
 
-      <p class="about">Versatex Email Style &middot; <span id="about-version">current version</span> &middot; <a href="install.html" target="_blank" rel="noopener">Install guide for colleagues</a></p>
+      <p class="about">D.E. Foxx Email Style &middot; <span id="about-version">current version</span> &middot; <a href="install.html" target="_blank" rel="noopener">Install guide for colleagues</a></p>
     </section>
   </main>
 
@@ -379,6 +386,12 @@
       var PREVIEW_WIDTH = 360;
       var TOAST_MS = 2600;
       var form = byId("signature-form");
+      var brand = byId("brand");
+      var brandLogo = byId("brand-logo");
+      var HEADER_LOGOS = {
+        defoxx: { src: "assets/defoxx-horizontal-reversed.png", alt: "D.E. Foxx & Associates" },
+        versatex: { src: "assets/vstx-horizontal-light.png", alt: "Versatex" },
+      };
       var fields = ["name", "title", "phone"].map(byId);
       var preview = byId("preview");
       var previewFrame = byId("preview-frame");
@@ -494,7 +507,7 @@
 
       // ---- Signature ----
       function current() {
-        return { name: fields[0].value.trim(), title: fields[1].value.trim(), phone: fields[2].value.trim() };
+        return { name: fields[0].value.trim(), title: fields[1].value.trim(), phone: fields[2].value.trim(), brand: brand.value };
       }
 
       // The preview is drawn at phone width and scaled to the pane, so it wraps the way recipients see it.
@@ -508,7 +521,10 @@
 
       function render() {
         var details = current();
-        var shown = { name: details.name || signatureDefaults().name, title: details.title, phone: details.phone };
+        var shown = { name: details.name || signatureDefaults().name, title: details.title, phone: details.phone, brand: details.brand };
+        var logo = HEADER_LOGOS[details.brand] || HEADER_LOGOS.defoxx;
+        brandLogo.src = logo.src;
+        brandLogo.alt = logo.alt;
         preview.innerHTML = signatureHtml(shown);
         shortPreview.innerHTML = shortSignatureHtml(shown);
         save.disabled = !details.name;
@@ -517,12 +533,14 @@
 
       welcome.hidden = isSignatureSetUp();
       var saved = signatureDetails();
+      brand.value = saved.brand;
       fields[0].value = saved.name;
       fields[1].value = saved.title;
       fields[2].value = saved.phone;
       render();
       window.addEventListener("resize", fitPreview);
 
+      brand.addEventListener("change", render);
       fields.forEach(function (field) {
         field.addEventListener("input", render);
       });

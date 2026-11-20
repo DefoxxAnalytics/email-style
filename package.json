@@ -1,10 +1,9 @@
 {
-  "name": "vstx-email-style",
+  "name": "email-style",
   "private": true,
-  "description": "Versatex Email Style: an Outlook add-in that restyles outgoing email and meeting invites on Send",
+  "description": "D.E. Foxx Email Style: an Outlook add-in that restyles outgoing email and meeting invites in the D.E. Foxx or Versatex look on Send",
   "type": "module",
   "scripts": {
-    "icons": "node make-icons.mjs",
     "validate": "office-addin-manifest validate site/manifest.xml",
     "start": "node server.mjs",
     "test": "node tests/run-all.cjs"

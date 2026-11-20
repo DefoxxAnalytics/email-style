@@ -10,6 +10,7 @@ const html = (own, quoted = "") => `<html><head></head><body><div style="${blue}
 const quote = (inner) => `<div id="appendonsend"></div><hr><div id="divRplyFwdMsg">From: someone</div>${inner}`;
 const mySignature = '<table id="x_vstx-signature"><tr><td><span style="font-size:16px">Reyes</span></td></tr></table>';
 const theirSignature = '<table id="x_vstx-signature"><tr><td><span style="font-size:16px">Edwin</span></td></tr></table>';
+const hasFullPanel = (part) => /<table id="vstx-signature" role="presentation"/.test(part);
 
 const MY_SIGNATURE = { vstxSignature: { name: "Reyes", title: "Analytics & AI Solutions", phone: "513-555-0142" } };
 function engine(roaming = MY_SIGNATURE, mailboxState = null, supported = () => true) {
@@ -33,22 +34,22 @@ function engine(roaming = MY_SIGNATURE, mailboxState = null, supported = () => t
 // ---- Short signature on replies ----
 let c = engine();
 const fresh = c.applyVersatexStyle(html("Hi team"));
-report("new email gets the full panel", fresh.includes("vstx-logo-v2.png") && !fresh.includes("vstx-signature-short"));
+report("new email gets the full panel", hasFullPanel(fresh) && !fresh.includes("vstx-signature-short"));
 
 const myThread = c.applyVersatexStyle(html("Thanks, will do", quote(`<div>Earlier</div>${mySignature}`)));
 const myOwn = myThread.slice(0, myThread.indexOf("appendonsend"));
-report("reply in a thread you signed gets the short signature", myOwn.includes("vstx-signature-short") && !myOwn.includes("vstx-logo-v2.png"));
+report("reply in a thread you signed gets the short signature", myOwn.includes("vstx-signature-short") && !hasFullPanel(myOwn));
 report("short signature: name, title, phone on one line", /Reyes<\/span><span[^>]*>&nbsp;&nbsp;\|&nbsp;&nbsp;<\/span><span[^>]*>Analytics &amp; AI Solutions<\/span>.*513&#8209;555&#8209;0142/.test(myOwn));
 report("short signature keeps the yellow edge", /vstx-signature-short[\s\S]*border-left:3px solid #fdc00f/.test(myOwn));
 
 const theirThread = c.applyVersatexStyle(html("Thanks", quote(theirSignature)));
-report("someone else's signature in the thread doesn't count", theirThread.slice(0, theirThread.indexOf("appendonsend")).includes("vstx-logo-v2.png"));
+report("someone else's signature in the thread doesn't count", hasFullPanel(theirThread.slice(0, theirThread.indexOf("appendonsend"))));
 
 const noThread = c.applyVersatexStyle(html("Thanks", quote("<div>Plain earlier message, no signature</div>")));
-report("first reply in a thread gets the full panel", noThread.slice(0, noThread.indexOf("appendonsend")).includes("vstx-logo-v2.png"));
+report("first reply in a thread gets the full panel", hasFullPanel(noThread.slice(0, noThread.indexOf("appendonsend"))));
 
 const off = engine({ ...MY_SIGNATURE, vstxFeatures: { shortReplies: false } }).applyVersatexStyle(html("Thanks", quote(mySignature)));
-report("switch off -> full panel on replies", off.slice(0, off.indexOf("appendonsend")).includes("vstx-logo-v2.png"));
+report("switch off -> full panel on replies", hasFullPanel(off.slice(0, off.indexOf("appendonsend"))));
 
 const again = c.applyVersatexStyle(myThread);
 report("short-signature reply is stable on re-send", again === myThread || c.applyVersatexStyle(again) === again);

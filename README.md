@@ -1,21 +1,22 @@
-# Versatex Email Style
+# D.E. Foxx Email Style
 
-An Outlook add-in that gives every email, reply and meeting invite you send the Versatex look. It works on **Send**: you write as usual, and the add-in restyles your part of the email just before it leaves. Recipients need nothing installed, because the styling is plain HTML inside the email.
+An Outlook add-in that gives every email, reply and meeting invite you send your company's look: **D.E. Foxx & Associates** or **Versatex**. It works on **Send**: you write as usual, and the add-in restyles your part of the email just before it leaves. Recipients need nothing installed, because the styling is plain HTML inside the email.
 
 It runs in **Outlook on the web** and **New Outlook for Windows**.
 
 | | |
 | --- | --- |
-| **Install guide** | https://defoxxanalytics.github.io/vstx-email-style/install.html |
-| **Live add-in** | https://defoxxanalytics.github.io/vstx-email-style/ (published from `site/` by GitHub Actions) |
+| **Install guide** | https://defoxxanalytics.github.io/email-style/install.html |
+| **Live add-in** | https://defoxxanalytics.github.io/email-style/ (published from `site/` by GitHub Actions) |
 | **Current version** | engine `launchevent.js?v=34`, manifest `1.0.0.0`, add-in Id `965d12db-94ce-4f1a-a25b-069ec2fa6665` |
-| **Tests** | `npm test`: 217 checks plus older suites and a re-send stability check |
+| **Tests** | `npm test`: 240 checks plus older suites and a re-send stability check |
 
 > **Every push to `main` goes live.** GitHub Actions runs the tests and the manifest check, then publishes `site/` to GitHub Pages. Outlook loads the add-in from there, so a change reaches every user's Send button about 10 minutes later.
 
 ## Contents
 
 - [What it does](#what-it-does)
+- [Which company look each person gets](#which-company-look-each-person-gets)
 - [Install](#install)
 - [Using it](#using-it)
 - [Privacy and safety](#privacy-and-safety)
@@ -32,38 +33,52 @@ It runs in **Outlook on the web** and **New Outlook for Windows**.
 
 When you select Send, the add-in:
 
-1. **Frames the email.** A 6px ink band with a yellow rule goes on top, and a signature panel goes at the bottom: the Versatex logo, your name, title and phone, and the hexagon cluster. Later replies in a thread that already carries your signature get a one-line signature instead.
-2. **Tidies the text.** Outlook's default look becomes Roboto/Arial 15px in Versatex ink. Formatting you chose on purpose (a colour, a size, code) is kept.
+1. **Frames the email.** A 6px ink band with a yellow rule goes on top, and a signature panel goes at the bottom: your company's logo, your name, title and phone, and your company's motif (the gold X for D.E. Foxx, the hexagon cluster for Versatex). Later replies in a thread that already carries your signature get a one-line signature instead.
+2. **Tidies the text.** Outlook's default look becomes Roboto/Arial 15px in brand ink. Formatting you chose on purpose (a colour, a size, code) is kept.
 3. **Brands lists and tables.** Bullets become grey hexagons (lighter when nested), top-level numbered lists get yellow number badges, and tables you insert get a black header with a yellow rule and light stripes. Tables pasted from elsewhere keep their own colours.
 4. **Applies smart formatting** to a few patterns you type (see [Using it](#using-it)): headings, callouts, KPI tiles, timed agendas, link buttons, status tags and key figures.
 5. **Checks for a missing attachment.** If your own text says "attached" or "enclosed" and nothing is attached, Send asks first.
 
 Only the part you wrote is touched. The quoted thread under a reply or forward is never changed. Meeting invites get the same treatment when you send them as the organiser.
 
+## Which company look each person gets
+
+Both companies share the same palette, fonts, band, lists and tables. Only the signature panel differs:
+
+| Company | Signature panel |
+| --- | --- |
+| D.E. Foxx & Associates | Stacked D.E. Foxx logo on the left, gold X on the right |
+| Versatex | Stacked Versatex logo on the left, hexagon cluster on the right |
+
+- Until someone saves their signature, the company comes from their email address: `@versatexmsp.com` gets Versatex, every other address gets D.E. Foxx.
+- Anyone can change it under **Company** in **Email style settings**; the choice is saved with their signature and wins over the address.
+- To send another domain to Versatex, add it to `BRAND_BY_DOMAIN` in `site/launchevent.js`.
+- To add a company, add an entry to `SIGNATURE_BRANDS` (logo and motif images in `site/assets/`, drawn at 2× for sharp screens), an `<option>` in the pane's Company menu and a header logo in the pane's `HEADER_LOGOS`. `tests/check-brands.cjs` checks that these stay in step.
+
 ## Install
 
-1. Open the [install guide](https://defoxxanalytics.github.io/vstx-email-style/install.html) and download the add-in file (`manifest.xml`).
+1. Open the [install guide](https://defoxxanalytics.github.io/email-style/install.html) and download the add-in file (`manifest.xml`).
 2. Go to [aka.ms/olksideload](https://aka.ms/olksideload). Outlook on the web opens, and after a few seconds the **Add-Ins for Outlook** window appears.
 3. Select **My add-ins**, scroll to **Custom Addins**, then **Add a custom add-in › Add from File**. Choose the downloaded file and accept the prompts.
 4. Restart New Outlook, or refresh Outlook on the web.
-5. Start a new email. A banner asks you to **Finish your Versatex signature**. Select **Open settings**, check your name, add your title and phone, and save.
+5. Start a new email. A banner asks you to **Finish your email signature**. Select **Open settings**, check your company and name, add your title and phone, and save.
 
-You can reopen the settings any time from a new email: **Apps › Versatex settings**.
+You can reopen the settings any time from a new email: **Apps › Email style settings**.
 
 > **If step 2 only opens your inbox,** Microsoft's add-ins page is having a known problem ([office-js #6625](https://github.com/OfficeDev/office-js/issues/6625)). It broke this way in April 2026 and again in November 2026. Try again later, or ask IT to deploy the add-in (below).
 
 **Updates are automatic.** Outlook loads the add-in's code from the live site every time, so nobody reinstalls for a new version. The settings pane header shows the running version. Only changes to the add-in file itself (new buttons or events) need a re-add or, for IT deployments, an update in the admin center.
 
-**Already added Versatex Email Style from another link?** Remove that copy first, so emails aren't styled twice. This copy is a separate add-in, so you enter your signature once more.
+**Already added Versatex Email Style, or this add-in from another link?** Remove that copy first, so emails aren't styled twice. This is a separate add-in, so you enter your signature once more.
 
-**To remove the add-in:** in Outlook on the web, select **More apps** in the left bar, then **Add apps › Manage your apps**, choose **…** next to Versatex Email Style, then **Remove**.
+**To remove the add-in:** in Outlook on the web, select **More apps** in the left bar, then **Add apps › Manage your apps**, choose **…** next to D.E. Foxx Email Style, then **Remove**.
 
 ### Deploying through IT
 
-Microsoft officially supports event-based (on-Send) add-ins only when an admin deploys them, and then nobody has to install anything. An admin in the Microsoft 365 admin center:
+Microsoft officially supports event-based (on-Send) add-ins only when an admin deploys them, and then nobody has to install anything. One deployment covers both companies. An admin in the Microsoft 365 admin center:
 
 1. Goes to **Settings › Integrated apps**, selects **Add-ins** near the top, then **Deploy Add-in** and **Next**.
-2. Chooses to upload a custom add-in, picks the URL option, enters `https://defoxxanalytics.github.io/vstx-email-style/manifest.xml` and selects **Upload**.
+2. Chooses to upload a custom add-in, picks the URL option, enters `https://defoxxanalytics.github.io/email-style/manifest.xml` and selects **Upload**.
 3. Chooses **Everyone**, **Specific users/groups** or **Just me**, then **Deploy**. It can take 24 to 72 hours to appear in Outlook.
 
 When the add-in file changes later, the admin selects the add-in and chooses **Update**. People who installed it themselves should remove their own copy (marked Custom app) if it then appears twice.
@@ -101,11 +116,11 @@ Both tags are removed from the subject before the email goes out.
 
 ### Buttons and settings
 
-In a new email or invite, the **Versatex** group has two buttons:
+In a new email or invite, the **Email style** group has two buttons:
 
-- **Apply Versatex style** restyles the draft now, so you can see the result before sending.
-- **Versatex settings** opens the settings pane:
-  - **Signature:** name, title and phone, with a phone-width preview.
+- **Apply email style** restyles the draft now, so you can see the result before sending.
+- **Email style settings** opens the settings pane:
+  - **Signature:** company, name, title and phone, with a phone-width preview. The header logo follows the company.
   - **Formatting:** one switch per feature, saved as soon as you flip it, each with an example drawn by the real engine.
   - **Help:** the cheat sheet above.
 
@@ -113,14 +128,14 @@ The pane follows Outlook's dark theme when Outlook reports it, otherwise the sys
 
 Settings are stored in Outlook `roamingSettings`, so they follow your mailbox across devices:
 
-- `vstxSignature`: `{ name, title, phone }`. With nothing saved, the name comes from your Outlook profile ("Last, First" is flipped to "First Last").
+- `vstxSignature`: `{ name, title, phone, brand }`, where `brand` is `defoxx` or `versatex`. With nothing saved, the name comes from your Outlook profile ("Last, First" is flipped to "First Last") and the company from your address.
 - `vstxFeatures`: the switches in the table above.
 
 ## Privacy and safety
 
 - **Everything runs inside Outlook.** The engine (`site/launchevent.js`) is plain JavaScript with no network calls of its own. There is no server, no database and no third-party service. Your email content never leaves Outlook because of the add-in.
 - **Permissions:** `ReadWriteItem`, the minimum needed to read and rewrite the email you are sending.
-- **What is fetched:** Outlook loads the add-in files from GitHub Pages, and Microsoft's `office.js` from Microsoft's CDN. Recipients' mail clients load the logo and hexagon images from GitHub Pages, like any image in an email.
+- **What is fetched:** Outlook loads the add-in files from GitHub Pages, and Microsoft's `office.js` from Microsoft's CDN. Recipients' mail clients load the logo and motif images from GitHub Pages, like any image in an email.
 - **No lost words:** before anything is sent, the styled text is compared word by word with what you wrote. If styling would drop a word, your part goes out with fonts and colours only. If even that would lose a word, it goes out exactly as written.
 - **Buttons never name the wrong site:** a link that hides its real destination (a user name before `@`, as in `https://sharepoint.com:x@evil.example`, or lookalike letters in the site name) is left as a plain link rather than turned into a button.
 - **Send is never stuck:** if styling fails, Outlook offers to send the email as it is. A failed attachment lookup never blocks Send.
@@ -139,7 +154,7 @@ Settings are stored in Outlook `roamingSettings`, so they follow your mailbox ac
 | `OnNewMessageCompose`, `OnNewAppointmentOrganizer` | `onNewComposeHandler` | First-use banner until a signature is saved |
 | `OnMessageSend`, `OnAppointmentSend` (SoftBlock) | `onMessageSendHandler` | Style the email, clean the subject, check attachments |
 
-It also adds the **Apply Versatex style** (`previewStyle`) and **Versatex settings** (`taskpane.html`) buttons to the message compose and appointment organizer surfaces. The add-in needs Mailbox requirement set 1.12. "Send anyway" prompts use 1.14 where available.
+It also adds the **Apply email style** (`previewStyle`) and **Email style settings** (`taskpane.html`) buttons to the message compose and appointment organizer surfaces. The add-in needs Mailbox requirement set 1.12. "Send anyway" prompts use 1.14 where available.
 
 `commands.html` loads `launchevent.js` and must call `Office.onReady()`, otherwise the Send handler hangs.
 
@@ -176,7 +191,7 @@ flowchart TD
    | `brandTables` | Ink header, yellow rule and stripes on inserted tables |
    | `withListTables` | Turns `<ul>`/`<ol>` into hexagon and number-badge tables, including odd pasted list shapes |
 
-3. Adds the brand bar and the full or one-line signature. If the email is already framed, only the text between bar and signature is re-tidied.
+3. Adds the brand bar and the full or one-line signature. The full panel takes its logo and motif from `SIGNATURE_BRANDS`, for the company in `signatureDetails()`. If the email is already framed, only the text between bar and signature is re-tidied.
 
 Every generated element carries a `vstx-` class or id, so later passes skip it.
 
@@ -185,25 +200,27 @@ Every generated element carries a `vstx-` class or id, so later passes skip it.
 ```
 .
 ├── site/                        published to GitHub Pages as is
-│   ├── launchevent.js           the engine: styling pipeline and Outlook event handlers
+│   ├── launchevent.js           the engine: styling pipeline, company looks and Outlook event handlers
 │   ├── commands.html            function file; loads launchevent.js?v=N and calls Office.onReady()
-│   ├── taskpane.html            settings pane (signature, switches, examples, help)
+│   ├── taskpane.html            settings pane (company, signature, switches, examples, help)
 │   ├── install.html             install guide for colleagues
 │   ├── index.html               sends the bare site address to the install guide
 │   ├── manifest.xml             the add-in file people install or IT deploys
-│   ├── assets/                  logo and hexagon cluster (used in emails), add-in icons
+│   ├── assets/                  signature logos and motifs for both companies (used in emails), header logos, add-in icons
 │   └── fonts/                   Roboto (OFL) for the settings pane and install guide
 ├── tests/
 │   ├── run-all.cjs              runs every suite (npm test)
 │   ├── check-*.cjs              suites, loaded against site/launchevent.js in a Node vm
+│   ├── check-brands.cjs         which company look each sender gets, and that its images exist
 │   ├── diff-resend.cjs          sending twice gives the same email
 │   ├── render-*.cjs             write previews to tests/preview/ (git-ignored)
 │   └── serve-static.cjs         serves the previews locally
 ├── .github/workflows/deploy.yml tests every push and pull request; publishes site/ from main
 ├── server.mjs                   HTTPS dev server for site/ on port 3000
-├── make-icons.mjs               regenerates the add-in icons
 └── package.json
 ```
+
+**Images in `site/assets/` are linked from sent emails. Never rename or delete one that has been published,** or the logos in earlier emails break. Add a new file name instead.
 
 ## Development
 
@@ -215,8 +232,8 @@ Every generated element carries a `vstx-` class or id, so later passes skip it.
 ### Setup
 
 ```bash
-git clone https://github.com/DefoxxAnalytics/vstx-email-style.git
-cd vstx-email-style
+git clone https://github.com/DefoxxAnalytics/email-style.git
+cd email-style
 npm install
 ```
 
@@ -227,7 +244,6 @@ npm install
 | `npm test` | Runs every suite against `site/launchevent.js`; exits 1 on any failure |
 | `npm run validate` | Validates `site/manifest.xml` with `office-addin-manifest` (uses Microsoft's online validation service) |
 | `npm start` | Serves `site/` at `https://localhost:3000` with Office dev certificates |
-| `npm run icons` | Regenerates the add-in icons |
 
 `npm start` is of limited use: Chrome's Local Network Access blocks Outlook on the web from loading `localhost`, so real testing goes through GitHub Pages.
 
@@ -276,6 +292,7 @@ Each Outlook client strips or rewrites different HTML, which drives most of the 
   - It strips class names (and `mso-` properties) from an email it displays. Text copied from a styled email therefore brings the add-in's tables without their `vstx-` classes. Most of them carry a background colour, so they count as pasted and are left alone; bullet lists don't, so any table holding the hexagon bullet (`HEXAGON_BULLET`) counts as the add-in's own list.
   - When the email is read, it strips `border-bottom` and `padding-bottom` from inline spans. That is why key figures use a background highlight: backgrounds on spans and full borders on inline-blocks (status tags) survive.
   - Text pasted from documents arrives as odd list shapes: bullets indented twice become a list inside a list with no item, and lines can sit inside a list outside any item. `attachParentlessLists` and `topLevelItems` handle both.
+- **Images:** emails can't use SVG, so logos and motifs are PNGs drawn at twice their display size.
 - **Weight 700, never 900:** mail clients don't load Roboto, and on Windows Arial at weight 900 becomes Arial Black.
 - **Rounded corners** show in Outlook on the web, on phones and in Gmail; classic Outlook draws them square.
 
@@ -283,9 +300,9 @@ Each Outlook client strips or rewrites different HTML, which drives most of the 
 
 These are deliberate decisions. Keep them unless the team agrees a change.
 
-- **Brand:** ink `#231f20`, yellow `#fdc00f`, greys `#58595b` and `#a7a9ac`, Roboto with Arial fallback. Yellow is used only for fills, rules and markers, never for text.
-- **Frame ("Design B"):** 6px ink band with a yellow rule from 9% to the edge; signature panel with the stacked logo and the transparent hexagon cluster. Emails do not get a baked-in dark background.
-- **Lists:** grey hexagon bullets (`#58595b`, then `#a7a9ac` deeper); yellow number badges on top-level numbered lists only.
+- **Brand:** D.E. Foxx and Versatex share one palette: ink `#231f20`, yellow `#fdc00f`, greys `#58595b` and `#a7a9ac`, Roboto with Arial fallback. Yellow is used only for fills, rules and markers, never for text.
+- **Frame ("Design B"):** 6px ink band with a yellow rule from 9% to the edge; signature panel with the company's stacked logo on the left and its motif on the right (D.E. Foxx: gold X; Versatex: hexagon cluster). Emails do not get a baked-in dark background.
+- **Lists:** grey hexagon bullets for both companies (`#58595b`, then `#a7a9ac` deeper); yellow number badges on top-level numbered lists only.
 - **Restyle defaults only:** text the sender formatted on purpose keeps its look; code keeps its font and size.
 - **No automatic red/green:** KPI colour comes only from a status tag the sender adds.
 - **Key-figure limit is per email:** more than 8 figures means bold only, across the whole email.
@@ -303,7 +320,7 @@ These are deliberate decisions. Keep them unless the team agrees a change.
 
 ## Version history
 
-The engine started as one person's add-in and was copied here at v34.
+The engine started as the Versatex Email Style add-in and was copied here at v34.
 
 | Version | Date | Change |
 | --- | --- | --- |
@@ -318,8 +335,8 @@ The engine started as one person's add-in and was copied here at v34.
 | v31 | 2026-11-16 | A bullet list copied from an earlier styled email stays a list |
 | v32 | 2026-11-16 | Plain section titles switch (off by default) |
 | v33 | 2026-11-17 | Security fix: links that hide their real site stay plain links instead of becoming buttons labelled with the wrong site |
-| v34 | 2026-11-20 | This repository: its own site and install guide, a new add-in Id (manifest 1.0.0.0), and publishing through GitHub Actions after the tests pass |
+| v34 | 2026-11-20 | This repository: D.E. Foxx Email Style, with a D.E. Foxx or Versatex signature panel per sender, its own site and install guide, a new add-in Id (manifest 1.0.0.0), and publishing through GitHub Actions after the tests pass |
 
 ---
 
-Built by Analytics & AI Solutions, Versatex.
+Built by Analytics & AI Solutions.
