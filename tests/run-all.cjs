@@ -19,6 +19,7 @@ const suites = [
   ["check-setup", [engine, manifest]],
   ["check-pasted", [engine]],
   ["check-brands", [engine, site]],
+  ["check-hardening", [engine]],
 ];
 const legacy = ["check-nested", "check-numbered", "check-design-b", "check-edge-cases", "check-new-features", "check-bare-title", "check-reply", "check-subject"];
 const LEGACY_PROBLEM = /error|text lost: [^n]|balanced: false|untouched: false|intact: false|styled: false|branded: false|stable: false|restyled: false|undefined|: false$/i;

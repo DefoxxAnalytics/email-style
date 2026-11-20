@@ -9,7 +9,7 @@ It runs in **Outlook on the web** and **New Outlook for Windows**.
 | **Install guide** | https://defoxxanalytics.github.io/email-style/install.html |
 | **Live add-in** | https://defoxxanalytics.github.io/email-style/ (published from `site/` by GitHub Actions) |
 | **Current version** | engine `launchevent.js?v=34`, manifest `1.0.0.0`, add-in Id `965d12db-94ce-4f1a-a25b-069ec2fa6665` |
-| **Tests** | `npm test`: 240 checks plus older suites and a re-send stability check |
+| **Tests** | `npm test`: 281 checks plus older suites and a re-send stability check |
 
 > **Every push to `main` goes live.** GitHub Actions runs the tests and the manifest check, then publishes `site/` to GitHub Pages. Outlook loads the add-in from there, so a change reaches every user's Send button about 10 minutes later.
 
@@ -124,7 +124,7 @@ In a new email or invite, the **Email style** group has two buttons:
   - **Formatting:** one switch per feature, saved as soon as you flip it, each with an example drawn by the real engine.
   - **Help:** the cheat sheet above.
 
-The pane follows Outlook's dark theme when Outlook reports it, otherwise the system setting. Its header shows the running version ("Active · v34").
+The pane follows Outlook's dark theme when Outlook reports it, otherwise the system setting. Its header shows the running version ("Active · v35").
 
 Settings are stored in Outlook `roamingSettings`, so they follow your mailbox across devices:
 
@@ -212,6 +212,7 @@ Every generated element carries a `vstx-` class or id, so later passes skip it.
 │   ├── run-all.cjs              runs every suite (npm test)
 │   ├── check-*.cjs              suites, loaded against site/launchevent.js in a Node vm
 │   ├── check-brands.cjs         which company look each sender gets, and that its images exist
+│   ├── check-hardening.cjs      edge cases: Outlook failures, generated emails, injection, damaged settings
 │   ├── diff-resend.cjs          sending twice gives the same email
 │   ├── render-*.cjs             write previews to tests/preview/ (git-ignored)
 │   └── serve-static.cjs         serves the previews locally
@@ -314,6 +315,10 @@ These are deliberate decisions. Keep them unless the team agrees a change.
 - **Classic Outlook for Windows** isn't a supported sending client. How styled emails look to classic Outlook readers has been checked only through Word renders, not in the real app.
 - Emails aren't adapted for **dark mode** readers; transparent images were chosen over baked backgrounds. The settings pane does follow dark mode.
 - After a `[review]` pause, pressing Enter inside a styled list adds a line, not a new bullet.
+- A horizontal line (`<hr>`) in your own text is read as the start of a forwarded thread, so the signature goes above it and the text below isn't styled.
+- Lettered or roman numbered lists (`a, b, c`, `I, II`), reversed lists and lists that skip numbers go out numbered 1, 2, 3; a start number is kept.
+- A `[review]` or `[plain]` tag already in someone else's subject (replying to "[Review] Contract") acts as if you had typed it.
+- The plain section titles switch (off by default) slows down on very large emails.
 - When the safety net falls back to basic styling, the sender isn't told and Send doesn't pause.
 - An email with more than 8 key figures gets no highlight at all. This is deliberate.
 - **Self-installing** depends on Microsoft's add-ins page (aka.ms/olksideload), which has broken more than once. IT deployment is the supported route.
@@ -336,6 +341,7 @@ The engine started as the Versatex Email Style add-in and was copied here at v34
 | v32 | 2026-11-16 | Plain section titles switch (off by default) |
 | v33 | 2026-11-17 | Security fix: links that hide their real site stay plain links instead of becoming buttons labelled with the wrong site |
 | v34 | 2026-11-20 | This repository: D.E. Foxx Email Style, with a D.E. Foxx or Versatex signature panel per sender, its own site and install guide, a new add-in Id (manifest 1.0.0.0), and publishing through GitHub Actions after the tests pass |
+| v35 | 2026-11-20 | Edge-case fixes from a full review, guarded by a new suite (check-hardening.cjs). Nothing the sender wrote is lost: two links on one line stay two links instead of becoming one button; bold lines, KPI lines and buttons keep their links, @mentions and pictures; an all-bold list or table stays a list or table. A button never shows one site and opens another. A pasted part of a received styled email no longer switches off your own frame. Word's quoted font names and characters such as ’ or é in headings come through intact. CSS no longer sets off the attachment reminder. 'Last, First (note)' becomes 'First Last (note)'. Styling an email again changes nothing. Large emails style in a fraction of a second (1.9 MB: 12.6 s before, 0.3 s now). Send always finishes exactly once, even when Outlook misbehaves |
 
 ---
 
