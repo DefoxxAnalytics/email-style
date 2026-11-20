@@ -1,0 +1,16 @@
+{
+  "name": "vstx-email-style",
+  "private": true,
+  "description": "Versatex Email Style: an Outlook add-in that restyles outgoing email and meeting invites on Send",
+  "type": "module",
+  "scripts": {
+    "icons": "node make-icons.mjs",
+    "validate": "office-addin-manifest validate site/manifest.xml",
+    "start": "node server.mjs",
+    "test": "node tests/run-all.cjs"
+  },
+  "devDependencies": {
+    "office-addin-dev-certs": "^3.0.1",
+    "office-addin-manifest": "^3.0.1"
+  }
+}
