@@ -1,6 +1,7 @@
 // Edge cases and invariants: Send must always finish exactly once, and styling must never lose, reorder
 // or endanger what the sender wrote, whatever the email, the settings or Outlook throw at it.
 const fs = require("node:fs");
+const path = require("node:path");
 const vm = require("node:vm");
 
 const source = fs.readFileSync(process.argv[2], "utf8");
@@ -10,7 +11,7 @@ process.on("unhandledRejection", (error) => report("no error escapes the engine 
 // ---- A fake Outlook whose every call can succeed, fail or throw ----
 
 function outlook(options = {}) {
-  const calls = { completed: [], bodySet: [], subjectSet: [], notices: [] };
+  const calls = { completed: [], bodySet: [], subjectSet: [], notices: [], notesSet: [] };
   const fault = (name) => (options.faults || {})[name];
   const respond = (name, callback, value) => {
     if (fault(name) === "throw") throw new Error(`${name} threw`);
@@ -46,6 +47,17 @@ function outlook(options = {}) {
   };
   const level = options.mailbox === undefined ? "1.14" : options.mailbox;
   const minor = (version) => Number(String(version).split(".")[1] || 0);
+  // Outlook's per-draft note (Mailbox 1.11): what the add-in remembers about this one draft between passes.
+  const notes = { ...(options.notes || {}) };
+  if (minor(level) >= 11) {
+    item.sessionData = {
+      getAsync: (name, callback) => respond("sessionData.getAsync", callback, notes[name]),
+      setAsync: (name, value, callback) => respond("sessionData.setAsync", (result) => {
+        if (result.status === "succeeded") { notes[name] = value; calls.notesSet.push([name, value]); }
+        callback(result);
+      }),
+    };
+  }
   const settings = options.settings || {};
   const Office = {
     actions: { associate() {} },
@@ -67,7 +79,13 @@ function outlook(options = {}) {
   vm.createContext(context);
   vm.runInContext(source, context);
   const event = { completed: (outcome) => calls.completed.push(outcome || {}) };
-  return { context, item, event, calls, body: () => body, subject: () => subject };
+  return {
+    context, item, event, calls, notes,
+    body: () => body,
+    subject: () => subject,
+    edit: (change) => { body = change(body); },
+    retitle: (value) => { subject = value; },
+  };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 5));
@@ -187,6 +205,8 @@ const rewrittenByOutlook = (html) => html
   .replace(/(<[a-z][^>]*?\s)id=(["']?)/gi, "$1id=$2x_")
   .replace(/\sclass=(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
   .replace(/#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})\b/gi, (_, r, g, b) => `rgb(${parseInt(r, 16)}, ${parseInt(g, 16)}, ${parseInt(b, 16)})`);
+const frameCount = (html) => `${count(html, /\bid="(?:x_)*vstx-bar"/g)} bar(s), ${count(html, /\bid="(?:x_)*vstx-signature"/g)} panel(s)`;
+const ownPartOf = (html, ctx) => html.slice(0, ctx.findQuoteStart(html));
 
 function invariants(input, ctx) {
   const problems = [];
@@ -215,6 +235,14 @@ function invariants(input, ctx) {
   }
   const afterOutlook = rewrittenByOutlook(output);
   if (ctx.applyVersatexStyle(afterOutlook) !== afterOutlook) problems.push("styled again after Outlook's rewrite");
+  // A later pass in a draft the add-in noted as styled: with nothing added nothing changes; a paragraph added
+  // before the signature never brings a second frame, loses no words and leaves the thread alone.
+  if (ctx.styleEmail(afterOutlook, { styledBefore: true }).html !== afterOutlook) problems.push("changed by a later pass with nothing added");
+  const withAddition = afterOutlook.replace(/<table\b[^>]*\bid="(?:x_)*vstx-signature"/, (table) => div("Added later") + table);
+  const tidied = ctx.styleEmail(withAddition, { styledBefore: true }).html;
+  if (frameCount(ownPartOf(tidied, ctx)) !== frameCount(ownPartOf(afterOutlook, ctx))) problems.push(`a later addition changed the frame: ${frameCount(ownPartOf(tidied, ctx))}`);
+  if (missingWords(withAddition, tidied).length) problems.push(`a later pass lost words: ${missingWords(withAddition, tidied).slice(0, 6).join(", ")}`);
+  if (!tidied.endsWith(afterOutlook.slice(ctx.findQuoteStart(afterOutlook)))) problems.push("a later pass changed the quoted thread");
   if (count(ownOut, /id="vstx-signature"/g) !== 1) problems.push(`${count(ownOut, /id="vstx-signature"/g)} signature panels`);
   if (count(ownOut, /id="vstx-bar"/g) !== 1) problems.push(`${count(ownOut, /id="vstx-bar"/g)} brand bars`);
   for (const [label, pattern] of [["script", /<script\b/gi], ["javascript: link", /javascript:/gi], ["event handler", /\son[a-z]+\s*=/gi]]) {
@@ -488,6 +516,159 @@ function invariants(input, ctx) {
     `${reviewThenSend.calls.bodySet.length} body writes, ${frames(reviewThenSend.body())}`);
   const pastedAfterStyling = styledOnce(draft).replace(/(<body[^>]*>[\s\S]*?<\/table>)/, `$1${div("See Pat's note:")}<table id="x_x_vstx-bar"><tr><td>bar</td></tr></table><div>Pat's words</div><table id="x_x_vstx-signature"><tr><td>Pat Lee</td></tr></table>`);
   report("a styled email pasted below your text in a styled draft doesn't add a second frame of yours", styled(pastedAfterStyling) === pastedAfterStyling);
+
+  // ---- 5c. A later pass in a draft the add-in noted as styled: what you added since gets the style ----
+
+  const once = styledOnce(draft);
+  const later = (html) => engine.styleEmail(html, { styledBefore: true }).html;
+  const barEnd = once.indexOf("</table>", once.search(/\bid="x_vstx-bar"/)) + "</table>".length;
+  const signatureAt = once.search(/<table\b[^>]*\bid="x_vstx-signature"/);
+  const signatureEnd = once.indexOf("</table>", signatureAt) + "</table>".length;
+  const insertAt = (html, at, fragment) => html.slice(0, at) + fragment + html.slice(at);
+  // The add-in's look on a block: its font, set inline on the element itself.
+  const hasStyle = (html, text) => new RegExp(`<(?:div|p|td)\\b[^>]*roboto[^>]*>(?:<[^>]+>)*${text}`, "i").test(html);
+  const between = (html, head, tail) => html.startsWith(head) && html.endsWith(tail) ? html.slice(head.length, html.length - tail.length) : null;
+
+  const typedAbove = later(once.replace(/<body[^>]*>/, (tag) => tag + div("Hi all,")));
+  const movedBelowBand = between(typedAbove, once.slice(0, barEnd), once.slice(barEnd));
+  report("text typed above the band moves just below it and takes the style; nothing else changes",
+    movedBelowBand !== null && hasStyle(movedBelowBand, "Hi all,") && frameCount(typedAbove) === "1 bar(s), 1 panel(s)", frameCount(typedAbove));
+
+  const afterGreeting = once.indexOf("Hi team,</div>") + "Hi team,</div>".length;
+  const pastedInside = later(insertAt(once, afterGreeting, div("One more point from the call.")));
+  const pastedPart = between(pastedInside, once.slice(0, afterGreeting), once.slice(afterGreeting));
+  report("a paragraph pasted between styled ones takes the style; the styled ones are left exactly as they were",
+    pastedPart !== null && hasStyle(pastedPart, "One more point from the call."));
+
+  // Outlook's rewrite renames the reply and Teams markers, so what follows the signature may be the quoted thread:
+  // a later pass never touches it.
+  const typedBelowInput = insertAt(once, signatureEnd, div("PS: call me after 3."));
+  report("text typed below the signature stays exactly where and as it was typed", later(typedBelowInput) === typedBelowInput);
+  const teamsDraft = wrap(div("Agenda: the Q3 numbers.") + `<div class="me-email-text" style="color:#252424;font-family:'Segoe UI'">Join the meeting now</div><div class="me-email-text-secondary">Meeting ID: 123 456 789</div>`);
+  const teamsOnce = styledOnce(teamsDraft);
+  const teamsWithAddition = later(insertAt(teamsOnce, teamsOnce.indexOf("Q3 numbers.</div>") + "Q3 numbers.</div>".length, div("Bring the deck.")));
+  const teamsBlock = teamsOnce.slice(teamsOnce.indexOf("</table>", teamsOnce.search(/<table\b[^>]*\bid="x_vstx-signature"/)) + "</table>".length);
+  report("a Teams joining block whose markers Outlook renamed is never moved or restyled",
+    later(teamsOnce) === teamsOnce && teamsWithAddition.endsWith(teamsBlock) && hasStyle(teamsWithAddition, "Bring the deck."));
+  const bareReply = wrap(div("Thanks Sam, agreed.") + `<div id="appendonsend"></div><div id="divRplyFwdMsg"><b>From:</b> Sam Lee</div><div>Quoted words from Sam</div>`);
+  const bareReplyOnce = styledOnce(bareReply);
+  const bareReplyQuote = bareReplyOnce.slice(bareReplyOnce.indexOf('<div id="x_appendonsend">'));
+  report("a reply without a divider line: its quoted thread is never restyled on a later pass",
+    later(bareReplyOnce) === bareReplyOnce && later(insertAt(bareReplyOnce, bareReplyOnce.indexOf("agreed.</div>") + "agreed.</div>".length, div("One more thing."))).endsWith(bareReplyQuote));
+  const signatureDeleted = insertAt(once.slice(0, signatureAt) + once.slice(signatureEnd), afterGreeting, div("Added after."));
+  report("with the signature panel deleted, a later pass leaves the email as it is (and adds no frame)", later(signatureDeleted) === signatureDeleted);
+  const mentionsFont = insertAt(once, afterGreeting, div("We use Roboto in the deck."));
+  report("a paragraph that only mentions the font by name still gets the style", hasStyle(later(mentionsFont), "We use Roboto in the deck."));
+
+  // Captured in Outlook on the web, 2026-11-24: a draft styled by Apply email style, then the same draft after a line
+  // was typed at the very top (Outlook put it inside the band's 6px cell) and a paragraph was pasted in the middle.
+  const owaApplied = fs.readFileSync(path.join(__dirname, "fixtures", "owa-applied.html"), "utf8");
+  const owaEdited = fs.readFileSync(path.join(__dirname, "fixtures", "owa-edited.html"), "utf8");
+  report("real Outlook draft after Apply: a later pass changes nothing, with or without the note",
+    later(owaApplied) === owaApplied && styled(owaApplied) === owaApplied && styled(owaEdited) === owaEdited);
+  const owaTidied = later(owaEdited);
+  const owaBand = owaTidied.slice(owaTidied.search(/<table\b[^>]*\bid="(?:x_)*vstx-bar"/), owaTidied.indexOf("</table>") + "</table>".length);
+  const owaParts = engine.topLevelParts(owaEdited.slice(owaEdited.indexOf('<body dir="ltr">') + '<body dir="ltr">'.length, owaEdited.indexOf("</body>")));
+  const untouched = owaParts.filter((part) => /roboto/i.test(part) && !/vstx-bar/.test(part)).every((part) => owaTidied.includes(part));
+  report("real Outlook draft: a line typed at the very top is lifted out of the band, below it, with the style",
+    !/Adding one line/.test(owaBand) && hasStyle(owaTidied, "Adding one line at the very top.") && owaTidied.indexOf("Adding one line") < owaTidied.indexOf("Hi team,"),
+    owaBand.slice(0, 200));
+  report("real Outlook draft: the pasted paragraph gets the style, every styled block stays byte for byte, one frame, no word lost",
+    hasStyle(owaTidied, "Pasted from the meeting notes: budget approved for Q1.") && untouched && frameCount(owaTidied) === "1 bar(s), 1 panel(s)" && missingWords(owaEdited, owaTidied).length === 0,
+    `${frameCount(owaTidied)}; lost: ${missingWords(owaEdited, owaTidied).join(", ")}`);
+
+  const hexagons = (html) => count(html, /&#11042;|⬢/g);
+  const addedList = later(insertAt(once, signatureAt, "<ul><li>Book the room</li><li>Send the invite</li></ul>"));
+  report("a bullet list added after the style is on gets the hexagon bullets", hexagons(addedList) === hexagons(once) + 2, `${hexagons(once)} -> ${hexagons(addedList)}`);
+
+  const styledLine = /<div\b[^>]*roboto[^>]*>Hi team,<\/div>/i.exec(once);
+  const typedInStyle = styledLine && insertAt(once, styledLine.index + styledLine[0].length, styledLine[0].replace("Hi team,", "One more thing,"));
+  report("a line typed inside styled text already has the look and is left as it is", Boolean(typedInStyle) && later(typedInStyle) === typedInStyle);
+
+  const nothingAdded = [once, styledOnce(wrap(div("Thanks Sam, agreed.") + quotedVersatex))].filter((html) => later(html) !== html);
+  report("a later pass with nothing added leaves the email exactly as it is", nothingAdded.length === 0);
+  const pastedStyledEmail = later(pastedAfterStyling);
+  report("a styled email pasted into a styled draft never adds a frame of yours", frameCount(pastedStyledEmail) === frameCount(pastedAfterStyling) && hasStyle(pastedStyledEmail, "See Pat's note:"));
+
+  const applyTypeSend = outlook({ body: draft, rewrite: rewrittenByOutlook });
+  applyTypeSend.context.previewStyle(applyTypeSend.event);
+  await settle();
+  applyTypeSend.edit((html) => html.replace(/<body[^>]*>/, (tag) => tag + div("Hi all,")));
+  applyTypeSend.context.onMessageSendHandler(applyTypeSend.event);
+  await settle();
+  report("Apply, type a line above the band, Send: one frame, and the new line has the style",
+    applyTypeSend.calls.bodySet.length === 2 && applyTypeSend.calls.completed[1]?.allowEvent === true && frameCount(applyTypeSend.body()) === "1 bar(s), 1 panel(s)" && hasStyle(applyTypeSend.body(), "Hi all,"),
+    `${applyTypeSend.calls.bodySet.length} body writes, ${frameCount(applyTypeSend.body())}`);
+  report("Apply leaves a note on the draft that it was styled", applyTypeSend.calls.notesSet.some(([name]) => name === "vstxStyled"));
+
+  const olderOutlook = outlook({ body: draft, rewrite: rewrittenByOutlook, mailbox: "1.10" });
+  olderOutlook.context.previewStyle(olderOutlook.event);
+  await settle();
+  olderOutlook.context.onMessageSendHandler(olderOutlook.event);
+  await settle();
+  report("Outlook without draft notes: Apply then Send still gives one frame (as in v36)",
+    olderOutlook.calls.bodySet.length === 1 && frameCount(olderOutlook.body()) === "1 bar(s), 1 panel(s)" && olderOutlook.calls.completed.length === 2);
+
+  const noteProblems = [];
+  for (const step of ["sessionData.getAsync", "sessionData.setAsync"]) for (const how of ["fail", "throw"]) {
+    const mail = outlook({ body: draft, rewrite: rewrittenByOutlook, faults: { [step]: how } });
+    mail.context.previewStyle(mail.event);
+    await settle();
+    mail.context.onMessageSendHandler(mail.event);
+    await settle();
+    if (mail.calls.completed.length !== 2 || mail.calls.completed[1]?.allowEvent !== true || frameCount(mail.body()) !== "1 bar(s), 1 panel(s)") {
+      noteProblems.push(`${step} ${how}: ${mail.calls.completed.length} completions, ${frameCount(mail.body())}`);
+    }
+  }
+  report("a draft note Outlook can't read or write: Apply and Send still finish once, with one frame", noteProblems.length === 0, noteProblems.join("; "));
+
+  // ---- 5d. Subject tags someone else put in the subject don't steer your email ----
+
+  const opened = async (subject, options = {}) => {
+    const mail = outlook({ subject, ...options });
+    mail.context.onNewComposeHandler(mail.event);
+    await settle();
+    if (options.typed !== undefined) mail.retitle(options.typed);
+    mail.context.onMessageSendHandler(mail.event);
+    await settle();
+    return mail;
+  };
+  const inherited = await opened("RE: [Review] Contract");
+  report("a reply to '[Review] Contract' sends at once, styled, with the subject unchanged",
+    inherited.calls.completed[1]?.allowEvent === true && inherited.subject() === "RE: [Review] Contract" && inherited.calls.bodySet.length === 1,
+    `${JSON.stringify(inherited.calls.completed[1])}, "${inherited.subject()}"`);
+  const typedReview = await opened("RE: [Review] Contract", { typed: "[review] RE: [Review] Contract" });
+  typedReview.context.onMessageSendHandler(typedReview.event);
+  await settle();
+  report("[review] you add to such a reply still pauses once, and only your tag is removed",
+    typedReview.calls.completed[1]?.allowEvent === false && typedReview.calls.completed[2]?.allowEvent === true && typedReview.subject() === "RE: [Review] Contract",
+    `"${typedReview.subject()}"`);
+  const inheritedPlain = await opened("FW: [plain] Notes");
+  report("an inherited [plain] doesn't stop the style and stays in the subject", inheritedPlain.calls.bodySet.length === 1 && inheritedPlain.subject() === "FW: [plain] Notes");
+  const typedPlain = await opened("RE: [Review] Contract", { typed: "[plain] RE: [Review] Contract" });
+  report("[plain] you add to such a reply skips the style and only your tag is removed",
+    typedPlain.calls.bodySet.length === 0 && typedPlain.subject() === "RE: [Review] Contract" && typedPlain.calls.completed[1]?.allowEvent === true, `"${typedPlain.subject()}"`);
+  const editedInherited = await opened("RE: [Review] Contract", { typed: "RE: [Review] Final contract" });
+  report("once you edit the inherited part of the subject, its tags count again (as in v36)",
+    editedInherited.calls.completed[1]?.allowEvent === false && editedInherited.subject() === "RE: Final contract", `"${editedInherited.subject()}"`);
+  const olderReply = await opened("RE: [Review] Contract", { mailbox: "1.10" });
+  report("Outlook without draft notes: tags behave as in v36", olderReply.calls.completed[1]?.allowEvent === false && olderReply.subject() === "RE: Contract");
+  const untagged = [];
+  for (const subject of ["", "RE: Contract", null]) {
+    const mail = outlook({ subject });
+    mail.context.onNewComposeHandler(mail.event);
+    await settle();
+    if (mail.calls.notesSet.length) untagged.push(JSON.stringify(subject));
+  }
+  report("opening an email without tags in the subject leaves no note", untagged.length === 0, untagged.join(", "));
+  const composeNoteProblems = [];
+  for (const step of ["subject.getAsync", "sessionData.setAsync"]) for (const how of ["fail", "throw"]) for (const saved of [undefined, { name: "Jordan Reyes" }]) {
+    const mail = outlook({ subject: "RE: [Review] Contract", faults: { [step]: how }, settings: { vstxSignature: saved } });
+    mail.context.onNewComposeHandler(mail.event);
+    await settle();
+    if (mail.calls.completed.length !== 1) composeNoteProblems.push(`${step} ${how}, saved ${Boolean(saved)}: ${mail.calls.completed.length}x`);
+  }
+  report("opening a reply finishes exactly once even if noting its subject fails", composeNoteProblems.length === 0, composeNoteProblems.join("; "));
 
   // ---- 6. Company by address (D.E. Foxx edition only) ----
 
