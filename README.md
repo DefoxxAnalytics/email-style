@@ -8,8 +8,8 @@ It runs in **Outlook on the web** and **New Outlook for Windows**.
 | --- | --- |
 | **Install guide** | https://defoxxanalytics.github.io/email-style/install.html |
 | **Live add-in** | https://defoxxanalytics.github.io/email-style/ (published from `site/` by GitHub Actions) |
-| **Current version** | engine `launchevent.js?v=35`, manifest `1.0.0.0`, add-in Id `965d12db-94ce-4f1a-a25b-069ec2fa6665` |
-| **Tests** | `npm test`: 281 checks plus older suites and a re-send stability check |
+| **Current version** | engine `launchevent.js?v=36`, manifest `1.0.0.0`, add-in Id `965d12db-94ce-4f1a-a25b-069ec2fa6665` |
+| **Tests** | `npm test`: 285 checks plus older suites and a re-send stability check |
 
 > **Every push to `main` goes live.** GitHub Actions runs the tests and the manifest check, then publishes `site/` to GitHub Pages. Outlook loads the add-in from there, so a change reaches every user's Send button about 10 minutes later.
 
@@ -124,7 +124,7 @@ In a new email or invite, the **Email style** group has two buttons:
   - **Formatting:** one switch per feature, saved as soon as you flip it, each with an example drawn by the real engine.
   - **Help:** the cheat sheet above.
 
-The pane follows Outlook's dark theme when Outlook reports it, otherwise the system setting. Its header shows the running version ("Active · v35").
+The pane follows Outlook's dark theme when Outlook reports it, otherwise the system setting. Its header shows the running version ("Active · v36").
 
 Settings are stored in Outlook `roamingSettings`, so they follow your mailbox across devices:
 
@@ -139,7 +139,7 @@ Settings are stored in Outlook `roamingSettings`, so they follow your mailbox ac
 - **No lost words:** before anything is sent, the styled text is compared word by word with what you wrote. If styling would drop a word, your part goes out with fonts and colours only. If even that would lose a word, it goes out exactly as written.
 - **Buttons never name the wrong site:** a link that hides its real destination (a user name before `@`, as in `https://sharepoint.com:x@evil.example`, or lookalike letters in the site name) is left as a plain link rather than turned into a button.
 - **Send is never stuck:** if styling fails, Outlook offers to send the email as it is. A failed attachment lookup never blocks Send.
-- **Re-sending is safe:** a styled draft is recognised by its `vstx-` markers, and only the text between the bar and the signature is re-tidied.
+- **Re-sending is safe:** once a draft has the style (Apply email style, or a `[review]` pause), Send leaves it exactly as it is, so the frame and the headings' accents never double. Outlook rewrites the add-in's markers in the draft, so the add-in recognises the brand bar at the top of the email.
 
 > **Who can change it.** The add-in reads and rewrites every email its users send, and anything pushed to `main` reaches them within minutes. This repository belongs to the shared DefoxxAnalytics GitHub account, so anyone with that login can publish a change. Keep the login to the people who maintain the add-in, and review every change before it is pushed.
 
@@ -191,7 +191,7 @@ flowchart TD
    | `brandTables` | Ink header, yellow rule and stripes on inserted tables |
    | `withListTables` | Turns `<ul>`/`<ol>` into hexagon and number-badge tables, including odd pasted list shapes |
 
-3. Adds the brand bar and the full or one-line signature. The full panel takes its logo and motif from `SIGNATURE_BRANDS`, for the company in `signatureDetails()`. If the email is already framed, only the text between bar and signature is re-tidied.
+3. Adds the brand bar and the full or one-line signature. The full panel takes its logo and motif from `SIGNATURE_BRANDS`, for the company in `signatureDetails()`. If the draft already has its frame from an earlier pass (Outlook hands it back with an `x_`-prefixed `vstx-bar` at the top), it's left exactly as it is; a frame whose ids are untouched gets only the text between bar and signature re-tidied.
 
 Every generated element carries a `vstx-` class or id, so later passes skip it.
 
@@ -322,6 +322,8 @@ These are deliberate decisions. Keep them unless the team agrees a change.
 - When the safety net falls back to basic styling, the sender isn't told and Send doesn't pause.
 - An email with more than 8 key figures gets no highlight at all. This is deliberate.
 - **Self-installing** depends on Microsoft's add-ins page (aka.ms/olksideload), which has broken more than once. IT deployment is the supported route.
+- Edits made after the style is on (after Apply email style or a `[review]` pause) aren't restyled. Text typed inside a styled paragraph keeps its look, but a new list or bold title goes out as typed.
+- The check for an already-styled draft looks for the brand bar at the very top. Text typed above the bar after the style is on makes Send add a second frame; a styled email pasted at the very top of a new draft, with nothing above it, makes the draft go out unstyled.
 
 ## Version history
 
@@ -342,6 +344,7 @@ The engine started as the Versatex Email Style add-in and was copied here at v34
 | v33 | 2026-11-17 | Security fix: links that hide their real site stay plain links instead of becoming buttons labelled with the wrong site |
 | v34 | 2026-11-20 | This repository: D.E. Foxx Email Style, with a D.E. Foxx or Versatex signature panel per sender, its own site and install guide, a new add-in Id (manifest 1.0.0.0), and publishing through GitHub Actions after the tests pass |
 | v35 | 2026-11-20 | Edge-case fixes from a full review, guarded by a new suite (check-hardening.cjs). Nothing the sender wrote is lost: two links on one line stay two links instead of becoming one button; bold lines, KPI lines and buttons keep their links, @mentions and pictures; an all-bold list or table stays a list or table. A button never shows one site and opens another. A pasted part of a received styled email no longer switches off your own frame. Word's quoted font names and characters such as ’ or é in headings come through intact. CSS no longer sets off the attachment reminder. 'Last, First (note)' becomes 'First Last (note)'. Styling an email again changes nothing. Large emails style in a fraction of a second (1.9 MB: 12.6 s before, 0.3 s now). Send always finishes exactly once, even when Outlook misbehaves |
+| v36 | 2026-11-24 | Apply email style then Send, or Send after a `[review]` pause, no longer adds a second frame and doubles the headings' accents. Each time an add-in sets the body, Outlook adds `x_` to every id and drops the classes, so v35 didn't recognise its own frame on the second pass. A draft whose brand bar comes first now goes out exactly as it is (`styledEarlierInThisDraft`). Found in real emails sent while both style add-ins were installed. 4 new checks, and every generated email is also checked after Outlook's rewrite |
 
 ---
 

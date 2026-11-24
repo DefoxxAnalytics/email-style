@@ -32,7 +32,7 @@ function outlook(options = {}) {
       getTypeAsync: (callback) => respond("body.getTypeAsync", callback, options.bodyType || "html"),
       getAsync: (type, callback) => respond("body.getAsync", callback, body),
       setAsync: (value, _options, callback) => respond("body.setAsync", (result) => {
-        if (result.status === "succeeded") { body = value; calls.bodySet.push(value); }
+        if (result.status === "succeeded") { body = options.rewrite ? options.rewrite(value) : value; calls.bodySet.push(value); }
         callback(result);
       }),
     },
@@ -181,6 +181,12 @@ const subset = (small, big) => {
   return small.every((x) => { const at = pool.indexOf(x); if (at === -1) return false; pool.splice(at, 1); return true; });
 };
 const balance = (html, tag) => count(html, new RegExp(`<${tag}\\b`, "gi")) - count(html, new RegExp(`</${tag}>`, "gi"));
+// What Outlook hands back after an add-in sets the body (seen in sent emails, 2026-11-24): every id gains "x_",
+// classes are gone and colours are rewritten.
+const rewrittenByOutlook = (html) => html
+  .replace(/(<[a-z][^>]*?\s)id=(["']?)/gi, "$1id=$2x_")
+  .replace(/\sclass=(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+  .replace(/#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})\b/gi, (_, r, g, b) => `rgb(${parseInt(r, 16)}, ${parseInt(g, 16)}, ${parseInt(b, 16)})`);
 
 function invariants(input, ctx) {
   const problems = [];
@@ -207,6 +213,8 @@ function invariants(input, ctx) {
     while (again[at] === output[at]) at++;
     problems.push(`not stable when styled again: …${output.slice(Math.max(0, at - 60), at + 40)}… became …${again.slice(Math.max(0, at - 60), at + 40)}…`);
   }
+  const afterOutlook = rewrittenByOutlook(output);
+  if (ctx.applyVersatexStyle(afterOutlook) !== afterOutlook) problems.push("styled again after Outlook's rewrite");
   if (count(ownOut, /id="vstx-signature"/g) !== 1) problems.push(`${count(ownOut, /id="vstx-signature"/g)} signature panels`);
   if (count(ownOut, /id="vstx-bar"/g) !== 1) problems.push(`${count(ownOut, /id="vstx-bar"/g)} brand bars`);
   for (const [label, pattern] of [["script", /<script\b/gi], ["javascript: link", /javascript:/gi], ["event handler", /\son[a-z]+\s*=/gi]]) {
@@ -446,6 +454,40 @@ function invariants(input, ctx) {
   await settle();
   if (unreadable.calls.completed.length !== 1) odd.push("compose with unreadable settings");
   report("odd Office behaviour still finishes exactly once with a readable message", odd.length === 0, odd.join("; "));
+
+  // ---- 5b. A second pass in the same draft, after Outlook has rewritten the first one's markup ----
+
+  const frames = (html) => `${count(html, /\bid="(?:x_)*vstx-bar"/g)} bar(s), ${count(html, /\bid="(?:x_)*vstx-signature"/g)} panel(s)`;
+  const draft = wrap(div("Hi team,") + div("<b>Next steps</b>") + "<ul><li>Agree the scope</li><li>Book the review</li></ul>" + div("KPI: Revenue $1.2M +5%") + div("Action: Jordan to send the deck by Friday") + div(`<a href="https://example.com/q3">Q3 report</a>`) + div("Thanks,"));
+  const styledOnce = (html) => rewrittenByOutlook(styled(html));
+  const secondPasses = {
+    "new email": draft,
+    reply: wrap(div("Thanks Sam, agreed.") + quotedVersatex),
+    "empty line typed above the bar": styledOnce(draft).replace(/<body[^>]*>/, "$&<div><br></div>"),
+  };
+  const restyled = Object.entries(secondPasses).filter(([name, html]) => {
+    const first = name.startsWith("empty") ? html : styledOnce(html);
+    return styled(first) !== first;
+  }).map(([name]) => name);
+  report("an email Outlook already rewrote after styling is left exactly as it is", restyled.length === 0, restyled.join(", "));
+  const applyThenSend = outlook({ body: draft, rewrite: rewrittenByOutlook });
+  applyThenSend.context.previewStyle(applyThenSend.event);
+  await settle();
+  applyThenSend.context.onMessageSendHandler(applyThenSend.event);
+  await settle();
+  report("Apply email style then Send: one frame, nothing styled twice",
+    applyThenSend.calls.bodySet.length === 1 && applyThenSend.calls.completed[1]?.allowEvent === true && frames(applyThenSend.body()) === "1 bar(s), 1 panel(s)",
+    `${applyThenSend.calls.bodySet.length} body writes, ${frames(applyThenSend.body())}`);
+  const reviewThenSend = outlook({ body: draft, subject: "[review] Next steps", rewrite: rewrittenByOutlook });
+  reviewThenSend.context.onMessageSendHandler(reviewThenSend.event);
+  await settle();
+  reviewThenSend.context.onMessageSendHandler(reviewThenSend.event);
+  await settle();
+  report("Send again after a [review] pause: one frame, nothing styled twice",
+    reviewThenSend.calls.completed[0]?.allowEvent === false && reviewThenSend.calls.completed[1]?.allowEvent === true && reviewThenSend.calls.bodySet.length === 1 && frames(reviewThenSend.body()) === "1 bar(s), 1 panel(s)",
+    `${reviewThenSend.calls.bodySet.length} body writes, ${frames(reviewThenSend.body())}`);
+  const pastedAfterStyling = styledOnce(draft).replace(/(<body[^>]*>[\s\S]*?<\/table>)/, `$1${div("See Pat's note:")}<table id="x_x_vstx-bar"><tr><td>bar</td></tr></table><div>Pat's words</div><table id="x_x_vstx-signature"><tr><td>Pat Lee</td></tr></table>`);
+  report("a styled email pasted below your text in a styled draft doesn't add a second frame of yours", styled(pastedAfterStyling) === pastedAfterStyling);
 
   // ---- 6. Company by address (D.E. Foxx edition only) ----
 
